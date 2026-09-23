@@ -270,7 +270,7 @@ defaultVersion = [
     {'vstr':'5.7.2', 'vint':5007002},
     {'vstr':'5.7.3', 'vint':5007003},
     {'vstr':'5.7.4', 'vint':5007004},
-    {'vstr':'5.8.1', 'vint':5008008},
+    {'vstr':'5.8.1', 'vint':5009000},
     {'vstr':'5.8.2', 'vint':5008002},
     {'vstr':'5.8.3', 'vint':5008003},
     {'vstr':'5.8.4', 'vint':5008004},
@@ -450,11 +450,11 @@ def main():
                         "proxyUsername": proxy['username'],
                         "deviceModel": dm,
                         "systemVersion": sv,
-                        "errorUrl": "http://127.0.0.1:8008/tg/intro_error/",
-                        "introCodeUrl": "http://127.0.0.1:8008/tg/intro_code/",
-                        "introPasswordUrl": "http://127.0.0.1:8008/tg/intro_password/",
-                        "passwordSetUrl": "http://127.0.0.1:8008/tg/new_password_set/",
-                        "frozenAccountUrl": "http://127.0.0.1:8008/tg/frozen_account/",
+                        "errorUrl": "http://127.0.0.1:9000/tg/intro_error/",
+                        "introCodeUrl": "http://127.0.0.1:9000/tg/intro_code/",
+                        "introPasswordUrl": "http://127.0.0.1:9000/tg/intro_password/",
+                        "passwordSetUrl": "http://127.0.0.1:9000/tg/new_password_set/",
+                        "frozenAccountUrl": "http://127.0.0.1:9000/tg/frozen_account/",
                         "pass": "",
                         "tdataPath": baseFolder,
                         "isDefaultPassword": True,
@@ -472,8 +472,8 @@ def main():
                         "appVersion": appVersion,
                         "appVersionStr": appVersionStr,
                         "lang": "en",
-                        "resetUrl":"http://127.0.0.1:8008/tg/reset_account/",
-                        "frozenUrl":"http://127.0.0.1:8008/tg/frozen_account/"
+                        "resetUrl":"http://127.0.0.1:9000/tg/reset_account/",
+                        "frozenUrl":"http://127.0.0.1:9000/tg/frozen_account/"
                         }
                     _file_path = os.path.join(path, "loginConfig.json")
                     if os.path.exists(_file_path):
