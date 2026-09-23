@@ -1,43 +1,40 @@
-from database.db import get_connection
+from database.oneScriptDb import get_connection
 import aiomysql
 
-async def reset_or_create_user(chat_id):
-    pool:aiomysql.Pool = await get_connection()
-    if not pool:
+def reset_or_create_user(chat_id):
+    conn = get_connection()
+    if not conn:
         print("[Error] not connection database (reset_or_create_user)")
         return False
     try:
-        async with pool.acquire() as conn:
-            conn:aiomysql.Connection
-            async with conn.cursor(aiomysql.DictCursor) as cursor:
-                cursor:aiomysql.DictCursor
-                sql = """
-                    INSERT INTO `user` (
-                        chat_id, state, code, message, `pass`, 
-                        api_id, api_hash, deviceModel, systemVersion, lang, phone, step
-                    ) 
-                    VALUES (%s, 'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'fa', '0', 'none')
-                    ON DUPLICATE KEY UPDATE 
-                        state = 'None',
-                        code = NULL,
-                        message = NULL,
-                        `pass` = NULL,
-                        api_id = NULL,
-                        is_closed = true,
-                        phone = '0',
-                        api_hash = NULL,
-                        deviceModel = NULL,
-                        systemVersion = NULL,
-                        step = 'none',
-                        lang = 'fa',
-                        updatedAt = CURRENT_TIMESTAMP;
-                """
-                
-                # مقدار chat_id را برای بخش INSERT ارسال می‌کنیم
-                await cursor.execute(sql, (chat_id,))
-                await conn.commit()
-                
-                return True
+        with conn.cursor() as cursor:
+            sql = """
+                INSERT INTO `user` (
+                    chat_id, state, code, message, `pass`, 
+                    api_id, api_hash, deviceModel, systemVersion, lang, phone, step
+                ) 
+                VALUES (%s, 'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'fa', '0', 'none')
+                ON DUPLICATE KEY UPDATE 
+                    state = 'None',
+                    code = NULL,
+                    message = NULL,
+                    `pass` = NULL,
+                    api_id = NULL,
+                    is_closed = true,
+                    phone = '0',
+                    api_hash = NULL,
+                    deviceModel = NULL,
+                    systemVersion = NULL,
+                    step = 'none',
+                    lang = 'fa',
+                    updatedAt = CURRENT_TIMESTAMP;
+            """
+            
+            # مقدار chat_id را برای بخش INSERT ارسال می‌کنیم
+            cursor.execute(sql, (chat_id,))
+            conn.commit()
+            
+            return True
 
     except Exception as e:
         print(f"[DB ERROR] reset_or_create_user: {e}")
@@ -46,106 +43,94 @@ async def reset_or_create_user(chat_id):
  
 
 
-async def update_state(chat_id, state, step='none'):
-    pool:aiomysql.Pool = await get_connection()
-    if not pool:
+def update_state(chat_id, state, step='none'):
+    conn = get_connection()
+    if not conn:
         print("[Error] not connection database (update_state)")
         return False
     try:
-        async with pool.acquire() as conn:
-            conn:aiomysql.Connection
-            async with conn.cursor(aiomysql.DictCursor) as cursor:
-                cursor:aiomysql.DictCursor
-                sql = """
-                    UPDATE user SET state = %s, step = %s WHERE chat_id = %s
-                """
-                
-                await cursor.execute(sql, (state, step, chat_id))
-                await conn.commit()
-                
-                return True
+        with conn.cursor() as cursor:
+            sql = """
+                UPDATE user SET state = %s, step = %s WHERE chat_id = %s
+            """
+            
+            cursor.execute(sql, (state, step, chat_id))
+            conn.commit()
+            
+            return True
 
     except Exception as e:
         print(f"[DB ERROR] update_state: {e}")
         return False
 
   
-async def update_phone(chat_id, phone, state, isRunApp):
-    pool = await get_connection()
-    if not pool:
+def update_phone(chat_id, phone, state, isRunApp):
+    conn = get_connection()
+    if not conn:
         print("[Error] not connection database (update_phone)")
         return False
     try:
-        async with pool.acquire() as conn:
-            conn:aiomysql.Connection
-            async with conn.cursor(aiomysql.DictCursor) as cursor:
-                cursor:aiomysql.DictCursor
-                if isRunApp:
-                    sql = """
-                        UPDATE user SET state = %s, phone = %s, isRunApp = %s, updatedAt = NOW() WHERE chat_id = %s
-                    """
-                    await cursor.execute(sql, (state, phone, isRunApp, chat_id))
-                    await conn.commit()
-                    return True
-                else:
-                    sql = """
-                        UPDATE user SET state = %s, phone = %s, updatedAt = NOW() WHERE chat_id = %s
-                    """
-                    await cursor.execute(sql, (state, phone, chat_id))
-                    await conn.commit()
-                
-                    return True
+        with conn.cursor() as cursor:
+            if isRunApp:
+                sql = """
+                    UPDATE user SET state = %s, phone = %s, isRunApp = %s, updatedAt = NOW() WHERE chat_id = %s
+                """
+                cursor.execute(sql, (state, phone, isRunApp, chat_id))
+                conn.commit()
+                return True
+            else:
+                sql = """
+                    UPDATE user SET state = %s, phone = %s, updatedAt = NOW() WHERE chat_id = %s
+                """
+                cursor.execute(sql, (state, phone, chat_id))
+                conn.commit()
+            
+                return True
 
     except Exception as e:
         print(f"[DB ERROR] update_phone: {e}")
         return False
 
 
-async def updateCode(chat_id:str, code:str):
-    pool:aiomysql.Pool = await get_connection()
-    if not pool:
+def updateCode(chat_id:str, code:str):
+    conn = get_connection()
+    if not conn:
         print("[Error] not connection database (updateCode)")
         return False
     try:
-        async with pool.acquire() as conn:
-            conn:aiomysql.Connection
-            async with conn.cursor(aiomysql.DictCursor) as cursor:
-                cursor:aiomysql.DictCursor
-                sql = """
-                    UPDATE user SET code = %s WHERE chat_id = %s
-                """
-                await cursor.execute(sql, (code, chat_id))
-                await conn.commit()
-            
-                return True
+        with conn.cursor() as cursor:
+            sql = """
+                UPDATE user SET code = %s WHERE chat_id = %s
+            """
+            cursor.execute(sql, (code, chat_id))
+            conn.commit()
+        
+            return True
 
     except Exception as e:
         print(f"[DB ERROR] updateCode: {e}")
         return False
 
-async def updatePassword(chat_id:str, password:str):
-    pool:aiomysql.Pool = await get_connection()
-    if not pool:
+def updatePassword(chat_id:str, password:str):
+    conn = get_connection()
+    if not conn:
         print("[Error] not connection database (updatePassword)")
         return False
     try:
-        async with pool.acquire() as conn:
-            conn:aiomysql.Connection
-            async with conn.cursor(aiomysql.DictCursor) as cursor:
-                cursor:aiomysql.DictCursor
-                sql = """
-                    UPDATE user SET pass = %s WHERE chat_id = %s
-                """
-                await cursor.execute(sql, (password, chat_id))
-                await conn.commit()
-            
-                return True
+        with conn.cursor() as cursor:
+            sql = """
+                UPDATE user SET pass = %s WHERE chat_id = %s
+            """
+            cursor.execute(sql, (password, chat_id))
+            conn.commit()
+        
+            return True
 
     except Exception as e:
         print(f"[DB ERROR] updatePassword: {e}")
         return False
 
-async def update_workscript_by_chat_id(
+def update_workscript_by_chat_id(
     chat_id,
     callbackquery_id=None,
     pid=None, 
@@ -161,8 +146,8 @@ async def update_workscript_by_chat_id(
     api_id = None,
     api_hash= None
 ):
-    pool:aiomysql.Pool = await get_connection()
-    if not pool:
+    conn = get_connection()
+    if not conn:
         return False
 
     try:
@@ -222,13 +207,10 @@ async def update_workscript_by_chat_id(
             SET {', '.join(fields)}
             WHERE chat_id = %s;
         """
-        async with pool.acquire() as conn:
-            conn:aiomysql.Connection
-            async with conn.cursor(aiomysql.DictCursor) as cursor:
-                cursor:aiomysql.DictCursor
-                await cursor.execute(query, values)
-                await conn.commit()
-                return cursor.rowcount > 0  # آیا واقعاً آپدیت شد؟
+        with conn.cursor() as cursor:
+            cursor.execute(query, values)
+            conn.commit()
+            return cursor.rowcount > 0  # آیا واقعاً آپدیت شد؟
 
     except Exception as e:
         print(f"[DB ERROR] update_workscript_by_chat_id: {e}")
