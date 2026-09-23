@@ -369,6 +369,14 @@ def getProxy():
             conn.close()
 
 def main():
+    
+    if input("Kill Explorer? (y | n) ") == 'y':
+        subprocess.run(
+        ["taskkill", "/F", "/IM", "explorer.exe"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
+    
     global appData
     
     
