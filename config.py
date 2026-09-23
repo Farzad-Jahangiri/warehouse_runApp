@@ -1,4 +1,4 @@
-from bot.config import states
+from myConfig import states
 TDATA_FOLDER_NAME = "sellAccount"
 DEFAULT_PATH_TDATA = r"F:\warehouseTdata\\sellAccount"
 BOT_API_ID = 17801496

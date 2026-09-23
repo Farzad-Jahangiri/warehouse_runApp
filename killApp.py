@@ -3,7 +3,7 @@ import threading, time
 #database
 from database.user import user_get, user_update
 #config
-from bot.config.states import empty_state
+from myConfig.states import empty_state
 from config import TDATA_FOLDER_NAME
 #utils
 from utils.fileHandler import delete_catch
