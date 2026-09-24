@@ -1,6 +1,5 @@
-
-TDATA_FOLDER_NAME = "TelegramData"
-DEFAULT_PATH_TDATA = r"D:\TelegramData"
+TDATA_FOLDER_NAME = "sellAccount"
+DEFAULT_PATH_TDATA = r"F:\warehouseTdata\\sellAccount"
 BOT_API_ID = 17801496
 BOT_API_HASH = "aef38df8bd63ce68c8dc9c49a8cad342"
 BOT_TOKEN = "5860444403:AAGVGMVeNeQbfhnyVqCK_zxDmYV_CkU9GYs"
