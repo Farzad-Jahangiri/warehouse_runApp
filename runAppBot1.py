@@ -3,43 +3,45 @@ from subprocess import Popen
 from typing import List, TypedDict
 import random
 from datetime import datetime
-from database.oneScriptDb import get_connection
-from utils.fileHandler import save_json_file
-from utils.phone import split_phone_number
-from myConfig.states import intro_phone
-from myConfig.deviseAndsystemVertion import deviceModel, systemVersion
-from config import TDATA_FOLDER_NAME
-from killApp import kill_app
-from utils.fileHandler import delete_catch
+# import logging
 import psutil
-import hashlib
-import threading
+import threading, time
+#database
+#config
+#utils
+from utils.fileHandler import delete_catch
+#database
+#--------------file-----------------
+from utils.fileHandler import save_json_file
+#--------------service-----------------
+# from service.update_data import updateState
+#--------------utils-----------------
+from utils.phone import split_phone_number
+#--------------config----------------
+from bot.config.states import intro_phone
+from bot.config.deviseAndsystemVertion import deviceModel, systemVersion
+from config import TDATA_FOLDER_NAME, DEFAULT_PATH_TDATA
+# from database import workscript
 from customType.userTypes import UserData
+#=================kill app==============
+from database.oneScriptDb import get_connection
+
+import hashlib
+
+worker_id = int(input("Worker number: "))
+
+#==============================================
+# logging.basicConfig(
+#     level=logging.INFO,
+#     format="%(asctime)s | %(levelname)s | %(message)s",
+#     handlers=[
+#         logging.FileHandler("runAppBot.log", encoding="utf-8"),
+#         logging.StreamHandler()
+#     ]
+# )
+#===============================================
 
 
-def get_all_workscripts():
-    conn = get_connection()
-    if not conn:
-        return []
-
-    try:
-        with conn.cursor() as cursor:
-            # cursor.execute("SELECT * FROM workscript;")
-            cursor.execute("""
-                SELECT *
-                FROM user
-                WHERE is_closed = TRUE
-                OR updatedAt <= NOW() - INTERVAL 2 MINUTE;
-            """)
-            records = cursor.fetchall()
-            return records  # لیست دیکشنری‌ها
-
-    except Exception as e:
-        print(f"[DB ERROR] get_all_workscripts: {e}")
-        return []
-
-    finally:
-        conn.close()
 
 def update_workscript_by_chat_id(
     chat_id,
@@ -55,7 +57,9 @@ def update_workscript_by_chat_id(
     deviceModel = None,
     systemVersion = None,
     api_id = None,
-    api_hash= None
+    api_hash= None,
+    selected = None,
+    _worker_id = None
 ):
     conn = get_connection()
     if not conn:
@@ -83,6 +87,9 @@ def update_workscript_by_chat_id(
         if isRunApp is not None:
             fields.append("isRunApp = %s")
             values.append(isRunApp)
+        if selected is not None:
+            fields.append("selected = %s")
+            values.append(isRunApp)
         if state is not None:
             fields.append("state = %s")
             values.append(state)
@@ -106,6 +113,9 @@ def update_workscript_by_chat_id(
         if api_hash:
             fields.append("api_hash = %s")
             values.append(api_hash)
+        if _worker_id:
+            fields.append("worker_id = %s")
+            values.append(0)
 
         # اگر هیچ فیلدی برای آپدیت نبود
         if not fields:
@@ -129,6 +139,7 @@ def update_workscript_by_chat_id(
 
     finally:
         conn.close()
+
 
 def fetch_record_by_runApp(runApp=True):
     conn = get_connection()
@@ -156,151 +167,9 @@ def fetch_record_by_runApp(runApp=True):
         if conn:
             conn.close()
 
-def fetch_record_by_state(state):
-    conn = get_connection()
-    if not conn:
-        print("[Error] not connection database (fetch_record_by_state)")
-        return None
-    try:
-        with conn.cursor() as cursor:
-            sql = """
-                SELECT id, phone, chat_id, `pass` AS password, api_id, api_hash, state, code, message, deviceModel, systemVersion,
-                 lang, createdAt, updatedAt FROM user WHERE state = %s
-            """
-            
-            cursor.execute(sql, (state,))
-            record = cursor.fetchall()
-            if not record:
-                return None
-            return record
-
-    except Exception as e:
-        print(f"[DB ERROR] fetch_record_by_state: {e}")
-        return None
-
-    finally:
-        if conn:
-            conn.close()
-
-def kill_telegram(pid: int, phone, chat_id) -> None:
-    try:
-        print(f"Killing PID {pid}")
-        if pid != 0 and psutil.pid_exists(pid):
-            psutil.Process(pid).kill()
-            delete_catch(fr'C:\Shared\{TDATA_FOLDER_NAME}\{phone}')
-        update_workscript_by_chat_id(chat_id, is_closed=False, isRunApp=False)
-    except Exception as e:
-        print("Error to kill app: ", e)
-
-def kill_app(max_age_seconds: int = 120):
-    try:
-        appList = get_all_workscripts()
-        killIndex = 0
-        runIndex = 0
-        for app in appList:
-            chat_id = app.get("chat_id")
-            pid = app.get('pId')
-            is_closed = app.get('is_closed')
-            isRunApp = app.get('isRunApp')
-            phone = app.get('phone')
-            if is_closed:
-                if pid:
-                    threading.Thread(target=kill_telegram, args=(int(pid), phone, chat_id), daemon=True).start()
-                    # kill_telegram(int(pid), phone, chat_id)
-                else:
-                    update_workscript_by_chat_id(chat_id, is_closed=False, isRunApp=False)
-            elif isRunApp:
-                if pid:
-                    threading.Thread(target=kill_telegram, args=(int(pid), phone, chat_id), daemon=True).start()
-                    # kill_telegram(int(pid), phone, chat_id)
-                else:
-                    update_workscript_by_chat_id(chat_id, is_closed=False, isRunApp=False)
-            
-            killIndex += 1
-        works = fetch_record_by_runApp(True)
-        if works:
-            runIndex = len(works)
-
-        allIndex = runIndex - killIndex
-        return allIndex if allIndex > 0 else 0
-            
-    except Exception as e:
-        print("Error on Kill app:", e)
-        return 0
 
 
 
-
-
-
-
-defaultVersion = [
-    {'vstr':'5.1.4', 'vint':5001004},
-    {'vstr':'5.1.5', 'vint':5001005},
-    {'vstr':'5.1.6', 'vint':5001006},
-    {'vstr':'5.1.7', 'vint':5001007},
-    {'vstr':'5.1.8', 'vint':5001008},
-    {'vstr':'5.2.1', 'vint':5002001},
-    {'vstr':'5.2.2', 'vint':5002002},
-    {'vstr':'5.2.3', 'vint':5002003},
-    {'vstr':'5.2.4', 'vint':5002004},
-    {'vstr':'5.2.5', 'vint':5002005},
-    {'vstr':'5.2.6', 'vint':5002006},
-    {'vstr':'5.3.1', 'vint':5003001},
-    {'vstr':'5.3.2', 'vint':5003002},
-    {'vstr':'5.4.1', 'vint':5004001},
-    {'vstr':'5.4.2', 'vint':5004002},
-    {'vstr':'5.4.3', 'vint':5004003},
-    {'vstr':'5.4.4', 'vint':5004004},
-    {'vstr':'5.4.5', 'vint':5004005},
-    {'vstr':'5.4.6', 'vint':5004006},
-    {'vstr':'5.5.1', 'vint':5005001},
-    {'vstr':'5.5.2', 'vint':5005002},
-    {'vstr':'5.5.3', 'vint':5005003},
-    {'vstr':'5.5.4', 'vint':5005004},
-    {'vstr':'5.5.5', 'vint':5005005},
-    {'vstr':'5.5.6', 'vint':5005006},
-    {'vstr':'5.5.7', 'vint':5005007},
-    {'vstr':'5.5.8', 'vint':5005008},
-    {'vstr':'5.6.1', 'vint':5006001},
-    {'vstr':'5.6.2', 'vint':5006002},
-    {'vstr':'5.6.3', 'vint':5006003},
-    {'vstr':'5.6.4', 'vint':5006004},
-    {'vstr':'5.7.1', 'vint':5007001},
-    {'vstr':'5.7.2', 'vint':5007002},
-    {'vstr':'5.7.3', 'vint':5007003},
-    {'vstr':'5.7.4', 'vint':5007004},
-    {'vstr':'5.8.1', 'vint':5009000},
-    {'vstr':'5.8.2', 'vint':5008002},
-    {'vstr':'5.8.3', 'vint':5008003},
-    {'vstr':'5.8.4', 'vint':5008004},
-    {'vstr':'5.8.5', 'vint':5008005},
-    {'vstr':'5.9.1', 'vint':5009001},
-    {'vstr':'5.9.2', 'vint':5009002},
-    {'vstr':'6.1.1', 'vint':6001001},
-    {'vstr':'6.1.2', 'vint':6001002},
-    {'vstr':'6.1.3', 'vint':6001003},
-    {'vstr':'6.1.4', 'vint':6001004},
-    {'vstr':'6.2.2', 'vint':6002002},
-    {'vstr':'6.2.3', 'vint':6002003},
-    {'vstr':'6.2.4', 'vint':6002004},
-    {'vstr':'6.2.5', 'vint':6002005},
-    {'vstr':'6.2.6', 'vint':6002006},
-    {'vstr':'6.3.1', 'vint':6003001},
-    {'vstr':'6.3.2', 'vint':6003002},
-    {'vstr':'6.3.3', 'vint':6003003},
-    {'vstr':'6.3.4', 'vint':6003004},
-    {'vstr':'6.3.6', 'vint':6003006},
-    {'vstr':'6.3.7', 'vint':6003007},
-    {'vstr':'6.3.8', 'vint':6003008},
-    {'vstr':'6.3.9', 'vint':6003009},
-    {'vstr':'6.4.1', 'vint':6004001},
-    {'vstr':'6.4.3', 'vint':6004003},
-    {'vstr':'6.4.4', 'vint':6004004},
-    {'vstr':'6.5.1', 'vint':6005001},
-    {'vstr':'6.6.1', 'vint':6006001},
-    {'vstr':'6.6.2', 'vint':6006002},
-]
 
 def generate_version(hash_value: str):
     # تبدیل هش به عدد
@@ -331,7 +200,10 @@ class appType(TypedDict):
 appData:List[appType] = []
 baseFolder = TDATA_FOLDER_NAME
 
-
+# def run_telegram(index: int) -> subprocess.Popen:
+#     path = fr"baseApp\login-app-{index}\Telegram.exe"
+#     process = subprocess.Popen(path)
+#     return process
 
 def run_telegram(workpath: str) -> subprocess.Popen:
     process = subprocess.Popen([
@@ -349,34 +221,131 @@ def get_free_index(appData, max_index=20):
             return i
     return None
 
-def getProxy():
+def fetch_record_by_state(state, worker_id):
     conn = get_connection()
+    if not conn:
+        print("[Error] not connection database (fetch_record_by_state)")
+        return None
     try:
         with conn.cursor() as cursor:
-            cursor.execute("SELECT * FROM proxy ORDER BY updated_at ASC LIMIT 1 FOR UPDATE")
-            proxyData = cursor.fetchone()
-            cursor.execute("""
-                    UPDATE proxy
-                    SET updated_at = NOW()
-                    WHERE id = %s
-                """, (proxyData['id'],))
-            return proxyData
+            sql = """
+                SELECT id, phone, chat_id, `pass` AS password, api_id, api_hash, state, code, message, deviceModel, systemVersion,
+                 lang, createdAt, updatedAt FROM user WHERE state = %s AND worker_id = %s
+            """
+            
+            cursor.execute(sql, (state, worker_id))
+            record = cursor.fetchall()
+            if not record:
+                conn.commit()
+                return None
+            # ids = [row['id'] for row in record]
+
+            # # 2️⃣ آپدیت همان ردیف‌ها
+            # placeholders = ",".join(["%s"] * len(ids))
+            # cursor.execute(f"""
+            #     UPDATE user
+            #     SET selected = true
+            #     WHERE id IN ({placeholders})
+            # """, ids)
+            # conn.commit()
+
+            return record
+
     except Exception as e:
-        print("[ERROR GET PROXY] ",e)
+        print(f"[DB ERROR] fetch_record_by_state: {e}")
         return None
+
     finally:
         if conn:
             conn.close()
 
+
+
+
+def kill_telegram(pid: int, phone, chat_id, worker_id=0) -> None:
+    try:
+        print(f"Killing PID {pid}")
+        if pid != 0 and psutil.pid_exists(pid):
+            psutil.Process(pid).kill()
+            delete_catch(fr'{DEFAULT_PATH_TDATA}\{phone}')
+            conn = get_connection()
+            if conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                                    UPDATE workers
+                                    SET count = CASE 
+                                        WHEN count > 0 THEN count - 1
+                                        ELSE 0
+                                    END
+                                    WHERE id = %s
+                            """,(worker_id))
+                conn.close()
+        update_workscript_by_chat_id(chat_id, is_closed=False, isRunApp=False, selected = False)
+        
+    except Exception as e:
+        print("Error to kill app: ", e)
+
+def get_all_workscripts(worker_id):
+    conn = get_connection()
+    if not conn:
+        return []
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT *
+                FROM user
+                WHERE (is_closed = TRUE
+                OR updatedAt <= NOW() - INTERVAL 2 MINUTE) AND worker_id = %s;
+            """, (worker_id,))
+            records = cursor.fetchall()
+            return records  # لیست دیکشنری‌ها
+
+    except Exception as e:
+        print(f"[DB ERROR] get_all_workscripts: {e}")
+        return []
+
+    finally:
+        conn.close()
+
+def kill_app(worker_id, max_age_seconds: int = 120):
+    try:
+        appList = get_all_workscripts(worker_id)
+        killIndex = 0
+        runIndex = 0
+        for app in appList:
+            chat_id = app.get("chat_id")
+            pid = app.get('pId')
+            is_closed = app.get('is_closed')
+            isRunApp = app.get('isRunApp')
+            phone = app.get('phone')
+            if is_closed:
+                if pid:
+                    threading.Thread(target=kill_telegram, args=(int(pid), phone, chat_id, worker_id), daemon=True).start()
+                    # kill_telegram(int(pid), phone, chat_id)
+                else:
+                    update_workscript_by_chat_id(chat_id, is_closed=False, isRunApp=False)
+            elif isRunApp:
+                if pid:
+                    threading.Thread(target=kill_telegram, args=(int(pid), phone, chat_id,worker_id), daemon=True).start()
+                    # kill_telegram(int(pid), phone, chat_id)
+                else:
+                    update_workscript_by_chat_id(chat_id, is_closed=False, isRunApp=False)
+            
+            killIndex += 1
+        works = fetch_record_by_runApp(True)
+        if works:
+            runIndex = len(works)
+
+        allIndex = runIndex - killIndex
+        return allIndex if allIndex > 0 else 0
+            
+    except Exception as e:
+        print("Error on Kill app:", e)
+        return 0
+
+
 def main():
-    
-    if input("Kill Explorer? (y | n) ") == 'y':
-        subprocess.run(
-        ["taskkill", "/F", "/IM", "explorer.exe"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
-    )
-    
     global appData
     
     
@@ -384,78 +353,158 @@ def main():
 
     while True:
         try:
-            countList = kill_app()
-            print("count of running app: ",countList)
+            countList = kill_app(worker_id=worker_id)
             if countList >= 20:
                 print("⚠️ Reached max apps, waiting for cleanup")
                 continue
-            records = fetch_record_by_state(intro_phone)
+            records = fetch_record_by_state(intro_phone, worker_id)
             
             if records:
                 conn = get_connection()
                 apiData = {}
+                isSetProxy = False
+                proxyData = {}
+                # import pdb;pdb.set_trace()
+                with conn.cursor() as cursor:
+                    cursor.execute("SELECT * FROM runscript WHERE id = 1")
+                    runscriptData = cursor.fetchone()
+                    isSetProxy = bool(int(runscriptData['proxy']))
                 
                 for record in records:
                     code, phone = split_phone_number(f'+{record.get('phone')}')
-                    # if code not in ['998']:
+                    
                     with conn.cursor() as cursor:
+                        if isSetProxy:
+                            cursor.execute("SELECT * FROM proxy ORDER BY updated_at ASC LIMIT 1 FOR UPDATE")
+                            proxyData = cursor.fetchone()
+                            cursor.execute("""
+                                    UPDATE proxy
+                                    SET updated_at = NOW()
+                                    WHERE id = %s
+                                """, (proxyData['id'],))
                         cursor.execute("""
                             SELECT *
                             FROM telegram_accounts_hash 
                             WHERE login_count < 300 
-                            AND api_id != 2040
                             AND selected = 0
+                            AND api_id != 2040
+                            AND os_hash = %s
                             ORDER BY login_count ASC
                             LIMIT 1
                             FOR UPDATE
-                        """)
+                        """,("Desktop",))
                         apiData = cursor.fetchone()
+                        
                         cursor.execute("""
-                        UPDATE telegram_accounts_hash
-                        SET selected = 1
-                        WHERE api_id = %s
-                    """, (apiData['api_id'],))
+                            UPDATE telegram_accounts_hash
+                            SET selected = 1
+                            WHERE id = %s
+                        """, (apiData['id'],))
                         conn.commit()
-                            
                     
-                    path = fr"F:\warehouseTdata\{baseFolder}\{str(code)+str(phone)}"
-                    print(f"Phone: {str(code)+str(phone)}")
-                    print(f"Chat id: {record.get('chat_id')}")
-                    print("Path: ", path)
-                    print("apiData:", apiData)
+                    
+                    path = fr"{DEFAULT_PATH_TDATA}\{str(code)+str(phone)}"
                     dmList = deviceModel.copy()
                     smList = systemVersion.copy()
+                    proxyIp = ''
+                    proxyPort = 0
+                    proxyUsername = ''
+                    proxyPassword = ''
+                    if isSetProxy:
+                        myProxy = proxyData
+                        proxyIp = myProxy['ip']
+                        proxyPort = int(myProxy['port'])
+                        proxyUsername = myProxy['username'] if bool(myProxy['username']) else ""
+                        proxyPassword = myProxy['password'] if bool(myProxy['password']) else ""
+                        # with conn.cursor() as cursor:
+                        #     cursor.execute("SELECT code FROM proxy_country WHERE code = %s", (int(code),))
+                        #     rw = cursor.fetchone()
+                        #     if bool(rw):
+                        #         myProxy = random.choice(proxyData)
+                        #         proxyIp = myProxy['ip']
+                        #         proxyPort = int(myProxy['port'])
+                        #         proxyUsername = myProxy['username'] if bool(myProxy['username']) else ""
+                        #         proxyPassword = myProxy['password'] if bool(myProxy['password']) else ""
+                    # for not proxy
+                    if code in ['880']:
+                        isSetProxy = False
+                        proxyIp = ""
+                        proxyPort = 0
+                        proxyUsername = ""
+                        proxyPassword = ""
+
                     random.shuffle(dmList)
                     random.shuffle(smList)
                     dm = random.choice(dmList)
                     sv = random.choice(smList)
-                    
-                    # apiId = 2040
-                    # apiHash = 'b18441a1ff607e10a989891a5462e627'
-                    # appVersion = 6006002
-                    # appVersionStr = '6.6.2'
-                    # if code in ['']:
-                    #     random.shuffle(defaultVersion)
-                    #     vDic = random.choice(defaultVersion)
-                    #     apiId = 2040
-                    #     apiHash = 'b18441a1ff607e10a989891a5462e627'
-                    #     appVersion = vDic['vint']
-                    #     appVersionStr = vDic['vstr']
-                    # else:
                     apiId = int(apiData['api_id'])
                     apiHash = apiData["api_hash"]
                     appVersion, appVersionStr = generate_version(apiHash)
+                    # if code in ['880', '20', '84', '244', '254', '213', '227', '232', '977', '62']:
+                    if code in ['']:
+                        apiId = 2040
+                        apiHash = 'b18441a1ff607e10a989891a5462e627'
+                        appVersion = 6006002
+                        appVersionStr = '6.6.2'
+
+                    # if code in ['91', '62', '63', '98']:
+                    #     apis = [
+                    #         {'id': 32453292, 'hash': '9c273745e1652b330ca57acfbad78f14'},
+                    #         {'id': 23156505, 'hash': 'cbdff065c83914d5beea9b4b711ba31e'},
+                    #         {'id': 38189779, 'hash': '5bb8e3d54b7e314299e1f8ff95b14034'},
+                    #         {'id': 25995819, 'hash': 'a29ce871cf33ba96b46d2db80500a6fe'},
+                    #         {'id': 35224834, 'hash': 'aab77549f017fd7023ca280e12a84cf0'},
+                    #         {'id': 29578308, 'hash': '436e751ff1fdd320eb94e16f969fdea3'},
+                    #         {'id': 36169979, 'hash': '032601b4845a6c4a2ad532539a5a931f'},
+                    #         {'id': 33159952, 'hash': 'a12cdb8e3201435f7b7b40929a0dea39'},
+                    #         {'id': 32053838, 'hash': '8702a468c600acab4b4a4f91fb2dc1df'},
+                    #         {'id': 34385640, 'hash': '689ecea2ac7f7c8ad57472c65b2abe7c'}
+                    #     ]
+                    #     models = [
+                    #         "Samsung SM-S918B",        # Galaxy S23 Ultra
+                    #         "Samsung SM-S911B",        # Galaxy S23
+                    #         "Samsung SM-S921B",        # Galaxy S24
+                    #         "Samsung SM-G998B",        # Galaxy S21 Ultra
+                    #         "Google Pixel 8 Pro",
+                    #         "Google Pixel 7 Pro",
+                    #         "Xiaomi 13 Pro",
+                    #         "Xiaomi 14",
+                    #         "OnePlus 12",
+                    #         "Huawei P60 Pro"
+                    #     ]
+                    #     system = [
+                    #         "SDK 21",  # Android 5.0
+                    #         "SDK 22",  # Android 5.1
+                    #         "SDK 23",  # Android 6.0
+                    #         "SDK 24",  # Android 7.0
+                    #         "SDK 25",  # Android 7.1
+                    #         "SDK 26",  # Android 8.0
+                    #         "SDK 27",  # Android 8.1
+                    #         "SDK 28",  # Android 9
+                    #         "SDK 29",  # Android 10
+                    #         "SDK 30",  # Android 11
+                    #         "SDK 31",  # Android 12
+                    #         "SDK 32",  # Android 12L
+                    #         "SDK 33",  # Android 13
+                    #         "SDK 34",  # Android 14
+                    #         "SDK 35",  # Android 15
+                    #         "SDK 36",  # Android 16
+                    #     ]
+                    #     dm = random.choice(models)
+                    #     sv = random.choice(system)
+                    #     apisSelected = random.choice(apis)
+                    #     apiId = apisSelected['id']
+                    #     apiHash = apisSelected['hash']
                     
-                    proxy = getProxy()
                     loginConfig = {
                         "phoneNumber": str(phone),
                         "chatId": str(record.get('chat_id')),
                         "prefix": str(code),
-                        "isSetProxy": True,
-                        "proxyIp": proxy['ip'],
-                        "proxyPassword": proxy['password'],
-                        "proxyPort": proxy['port'],
-                        "proxyUsername": proxy['username'],
+                        "isSetProxy": isSetProxy,
+                        "proxyIp": proxyIp,
+                        "proxyPassword": proxyPassword,
+                        "proxyPort": proxyPort,
+                        "proxyUsername": proxyUsername,
                         "deviceModel": dm,
                         "systemVersion": sv,
                         "errorUrl": "http://127.0.0.1:9000/tg/intro_error/",
@@ -469,8 +518,6 @@ def main():
                         "apiId": apiId,
                         "apiHash": apiHash,
                     }
-                    print(appVersion)
-                    print(appVersionStr)
                     apiConfig = {
                         "apiId": apiId,
                         "apiHash": apiHash,
@@ -479,9 +526,7 @@ def main():
                         "tdataPath": baseFolder,
                         "appVersion": appVersion,
                         "appVersionStr": appVersionStr,
-                        "lang": "en",
-                        "resetUrl":"http://127.0.0.1:9000/tg/reset_account/",
-                        "frozenUrl":"http://127.0.0.1:9000/tg/frozen_account/"
+                        "lang": "en"
                         }
                     _file_path = os.path.join(path, "loginConfig.json")
                     if os.path.exists(_file_path):
@@ -510,7 +555,6 @@ def main():
                     save_json_file("loginConfig", loginConfig, path)
                     save_json_file("apiConfig", apiConfig, path)
                     process = run_telegram(path)
-                    print("pid:", process.pid)
                     update_workscript_by_chat_id(
                         chat_id=record.get('chat_id'),
                         pid=process.pid,
@@ -523,6 +567,23 @@ def main():
                         app_verssion=appVersion,
                         appversionStr=appVersionStr
                     )
+                    # print("\n===== LOGIN CONFIG")
+                    # logging.info("\nLOGIN CONFIG")
+                    for key, value in loginConfig.items():
+                        # print(f"{key:20} : {value}")
+                        print(f"{key:20} : {value}")
+                        
+
+                    # print("\n===== API CONFIG")
+                    # logging.info("\nAPI CONFIG")
+                    for key, value in apiConfig.items():
+                        # print(f"{key:20} : {value}")
+                        print(f"{key:20} : {value}")
+                    
+                    # print(f"{'pid':20} : {process.pid}\n\n")
+                    print(f"{'pid':20} : {process.pid}\n\n{'-' * 50}")
+                    
+
 
                 conn.close()
             else:

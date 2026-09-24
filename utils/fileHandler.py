@@ -4,6 +4,7 @@ import os, stat,shutil, psutil
 import subprocess
 from subprocess import Popen
 import json                 
+from config import TDATA_FOLDER_NAME
 
 def save_file(name: str, value: str, base_path: str) -> None:
     path = Path(base_path)
@@ -62,3 +63,55 @@ def delete_catch(path:str):
             print(f"Folder does not exist: {DebugLogsPath}")
     except Exception as e:
         print('[Error delete_catch] ', e)
+
+
+def copyBackupTdata(data):
+    try:
+        time.sleep(5)
+        src = fr"C:\Shared\{TDATA_FOLDER_NAME}\{data.get('phone')}"
+        dst = fr"D:\backup-reciver\{data.get('phone')}"
+        shutil.copytree(src, dst, dirs_exist_ok=True)
+        folder_path_emoji = fr"D:\backup-reciver\{data.get('phone')}\tdata\emoji"
+        if os.path.exists(folder_path_emoji):
+            shutil.rmtree(folder_path_emoji)
+            print("Deleted.emoji")
+        else:
+            print("Folder does not exist.emoji")
+        folder_path_user_data = fr"D:\backup-reciver\{data.get('phone')}\tdata\user_data"
+        if os.path.exists(folder_path_user_data):
+            shutil.rmtree(folder_path_user_data)
+            print("Deleted.emoji")
+        else:
+            print("Folder does not exist.emoji")
+        folder_path_DebugLogs = fr"D:\backup-reciver\{data.get('phone')}\DebugLogs"
+        if os.path.exists(folder_path_DebugLogs):
+            shutil.rmtree(folder_path_DebugLogs)
+            print("Deleted.DebugLogs")
+        else:
+            print("Folder does not exist.DebugLogs")
+        folder_path = fr"D:\backup-reciver\{data.get('phone')}"
+        if os.path.exists(folder_path):
+            for root, dirs, files in os.walk(folder_path):
+                for f in files:
+                    file_path = os.path.join(root, f)
+                    try:
+                        size = os.path.getsize(file_path)
+                        if 600*1024 <= size <= 630*1024:
+                            os.remove(file_path)
+                            print("Deleted.611KB:", file_path)
+                    except Exception as e:
+                        print("Error:", file_path, e)
+        else:
+            print("Folder does not exist")
+        targets = ["settingss", "countries", "shortcuts-custom.json", "shortcuts-default.json"]
+        if os.path.exists(folder_path):
+            for root, dirs, files in os.walk(folder_path):
+                for f in files:
+                    if f in targets:
+                        file_path = os.path.join(root, f)
+                        os.remove(file_path)
+                        print(f"Deleted: {f}")
+        else:
+            print("Folder does not exist")
+    except Exception as e:
+        print("[Don't copy tdata to backup folder] ", e)

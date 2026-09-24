@@ -28,5 +28,6 @@ class UserData(TypedDict):
     message_id:str
     appVersionStr: str
     appVersion: int
+    captcha: bool
 
 

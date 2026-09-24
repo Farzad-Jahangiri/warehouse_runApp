@@ -13,11 +13,11 @@ DB_CONFIG = {
 
 pool = PooledDB(
     creator=pymysql,      # کتابخانه اتصال
-    maxconnections=3,    # حداکثر کانکشن
-    mincached=3,          # حداقل کانکشن آماده
-    maxcached=2,          # حداکثر کانکشن idle
+    maxconnections=50,    # حداکثر کانکشن
+    mincached=30,          # حداقل کانکشن آماده
+    maxcached=10,          # حداکثر کانکشن idle
     blocking=True,        # اگر پر شد صبر کند
-    maxusage= 5000,
+    maxusage= 5000,        # هر connection بعد از 5000 بار استفاده بسته و جایگزین می‌شود
     ping=1,               # قبل استفاده connection چک شود
     **DB_CONFIG
 )

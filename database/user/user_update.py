@@ -1,5 +1,4 @@
-from database.oneScriptDb import get_connection
-import aiomysql
+from database.db import get_connection
 
 def reset_or_create_user(chat_id):
     conn = get_connection()
@@ -11,9 +10,9 @@ def reset_or_create_user(chat_id):
             sql = """
                 INSERT INTO `user` (
                     chat_id, state, code, message, `pass`, 
-                    api_id, api_hash, deviceModel, systemVersion, lang, phone, step
+                    api_id, api_hash, deviceModel, systemVersion, lang, phone, step, selected
                 ) 
-                VALUES (%s, 'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, 'fa', '0', 'none')
+                VALUES (%s, 'None', NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '0', 'none', false)
                 ON DUPLICATE KEY UPDATE 
                     state = 'None',
                     code = NULL,
@@ -26,7 +25,7 @@ def reset_or_create_user(chat_id):
                     deviceModel = NULL,
                     systemVersion = NULL,
                     step = 'none',
-                    lang = 'fa',
+                    selected = false,
                     updatedAt = CURRENT_TIMESTAMP;
             """
             
@@ -40,7 +39,9 @@ def reset_or_create_user(chat_id):
         print(f"[DB ERROR] reset_or_create_user: {e}")
         return False
 
- 
+    finally:
+        if conn:
+            conn.close()
 
 
 def update_state(chat_id, state, step='none'):
@@ -63,8 +64,11 @@ def update_state(chat_id, state, step='none'):
         print(f"[DB ERROR] update_state: {e}")
         return False
 
-  
-def update_phone(chat_id, phone, state, isRunApp):
+    finally:
+        if conn:
+            conn.close()
+
+def update_phone(chat_id, phone, state, isRunApp, worker_id):
     conn = get_connection()
     if not conn:
         print("[Error] not connection database (update_phone)")
@@ -73,9 +77,9 @@ def update_phone(chat_id, phone, state, isRunApp):
         with conn.cursor() as cursor:
             if isRunApp:
                 sql = """
-                    UPDATE user SET state = %s, phone = %s, isRunApp = %s, updatedAt = NOW() WHERE chat_id = %s
+                    UPDATE user SET state = %s, phone = %s, isRunApp = %s, updatedAt = NOW(), worker_id = %s WHERE chat_id = %s
                 """
-                cursor.execute(sql, (state, phone, isRunApp, chat_id))
+                cursor.execute(sql, (state, phone, isRunApp, worker_id, chat_id))
                 conn.commit()
                 return True
             else:
@@ -90,6 +94,10 @@ def update_phone(chat_id, phone, state, isRunApp):
     except Exception as e:
         print(f"[DB ERROR] update_phone: {e}")
         return False
+
+    finally:
+        if conn:
+            conn.close()
 
 
 def updateCode(chat_id:str, code:str):
@@ -144,7 +152,8 @@ def update_workscript_by_chat_id(
     deviceModel = None,
     systemVersion = None,
     api_id = None,
-    api_hash= None
+    api_hash= None,
+    selected = None
 ):
     conn = get_connection()
     if not conn:
@@ -171,6 +180,9 @@ def update_workscript_by_chat_id(
             values.append(is_closed)
         if isRunApp is not None:
             fields.append("isRunApp = %s")
+            values.append(isRunApp)
+        if selected is not None:
+            fields.append("selected = %s")
             values.append(isRunApp)
         if state is not None:
             fields.append("state = %s")
@@ -207,15 +219,17 @@ def update_workscript_by_chat_id(
             SET {', '.join(fields)}
             WHERE chat_id = %s;
         """
+
         with conn.cursor() as cursor:
             cursor.execute(query, values)
-            conn.commit()
             return cursor.rowcount > 0  # آیا واقعاً آپدیت شد؟
 
     except Exception as e:
         print(f"[DB ERROR] update_workscript_by_chat_id: {e}")
         return False
 
+    finally:
+        conn.close()
 
 
 
